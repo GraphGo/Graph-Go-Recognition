@@ -3,9 +3,10 @@ const app = express();
 const bodyParser = require('body-parser')
 const cors = require('cors')
 
+
 app.use(cors())
 app.options('*', cors())
-app.use(bodyParser.json());
+app.use(bodyParser.json({limit:'5mb'}));
 app.set('trust proxy', true);
 
 const routes = require('./routes');
