@@ -9,4 +9,6 @@ router.post('/', async (req, res) => {
     }
     // call recognition function
     res.send({result: [1, 5, 2, 3, 4]});
-})
+});
+
+module.exports = router;
