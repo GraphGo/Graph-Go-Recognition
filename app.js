@@ -6,7 +6,7 @@ const cors = require('cors')
 
 app.use(cors())
 app.options('*', cors())
-app.use(bodyParser.json({limit:'5mb'}));
+app.use(bodyParser.json({parameterLimit:500000,limit:'50mb', extended:true}));
 app.set('trust proxy', true);
 
 const routes = require('./routes');
