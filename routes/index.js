@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const cv = require('')
+const cv = require('opencv.js')
 const { Canvas, createCanvas, Image, ImageData, getContext } = require('canvas');
 const { JSDOM } = require('jsdom');
-
+const tf = require('@tensorflow/tfjs-node');
+const jimp = require('jimp')
 
 router.post('/', async (req, res) => {
     if (!req.body) {
@@ -11,16 +12,31 @@ router.post('/', async (req, res) => {
             message: "No data is passed in!"
         });
     }
-    installDOM();
-    const canvas = createCanvas();
+    if (!global.model) {
+        try{
+        global.model = await tf.loadLayersModel('https://raw.githubusercontent.com/Rabona17/tfjs_models/main/model/model.json');
+        } catch{}
+    }
+    console.log("finished loading models");
     console.log(req.body);
-    var img = new Image();
-    img.src = req.body.data;
-    const canvas = createCanvas(img.width, img.height);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    var imageData = ctx.getImageData(req.body.left, req.body.top, req.body.width, req.body.height);
-    predict_(imageData, res);
+    // try {
+    const buf = await Buffer.from(req.body.data, 'base64');
+    // } catch(err) {
+    //     console.log(err);
+    // }
+    let jimpSrc = await jimp.read(buf);
+    jimpSrc.write('currentImage.png');
+    jimpSrc.crop(parseInt(req.body.left)+5,parseInt(req.body.top)+5, parseInt(req.body.width)-10, parseInt(req.body.height)-10).write('./a.png');
+    console.log(jimpSrc.getWidth());
+    //installDOM();
+    console.log(req.body);
+    // var img = new Image();
+    // img.src = req.body.data;
+    // const canvas = createCanvas(img.width, img.height);
+    // const ctx = canvas.getContext('2d');
+    // ctx.drawImage(img, 0, 0);
+    // var imageData = ctx.getImageData(req.body.left, req.body.top, req.body.width, req.body.height);
+    predict_(jimpSrc.bitmap, res);
 
     // call recognition function
 
@@ -28,7 +44,7 @@ router.post('/', async (req, res) => {
 
 
 function getSortedBboxes(imageData) {
-    var src = cv.matFromImageData(imageData);
+    let src = cv.matFromImageData(imageData);
     //var cvs = document.getElementById("myCanvas");
     //var src = cv.imread('myCanvas');
     //var src = context.getImageData(bboxes[i].x+x1, bboxes[i].y+y1, bboxes[i].width, bboxes[i].height);
@@ -49,6 +65,7 @@ function getSortedBboxes(imageData) {
     for (let i = 0; i < contours.size(); ++i) {
         pred_rois.push(cv.boundingRect(contours.get(i)));
     }
+    console.log(pred_rois.length)
     pred_rois.sort(sortBboxLeftToRight)
     //psuedo non-max suppression based purely on iou
     var suppressed_rois = []
@@ -61,16 +78,23 @@ function getSortedBboxes(imageData) {
     }
     return suppressed_rois
 }
-
+function sortBboxLeftToRight(a, b){
+    if (a['x']<b['x']){
+        return -1;
+    }
+    else{
+        return 1;
+    }
+}
 function predict_(imageData, res) {
-    if (window.model) {
-        var bboxes = getSortedBboxes(imageData);
+    if (global.model) {
+        let bboxes = getSortedBboxes(imageData);
         // var canvas = document.getElementById(canvas_id);
         // var context = canvas.getContext('2d');
-        var input1 = cv.matFromImageData(imageData);;
+        let input1 = cv.matFromImageData(imageData);
         var model;
 
-        var pred_arr = []
+        let predPromises = []
         for (let i = 0; i < bboxes.length; ++i) {
             // var input = context.getImageData(bboxes[i].x+x1, bboxes[i].y+y1, bboxes[i].width, bboxes[i].height);
             // input = cv.matFromImageData(input);
@@ -109,16 +133,23 @@ function predict_(imageData, res) {
             // mat = cv.matFromArray(28, 28, cv.CV_8U, tensor.dataSync());
             // cv.imshow('myCanvas', mat);
             // tensor = tensor.div(255)
-            window.model.predict([tensor.reshape([1, 28, 28, 1])]).array().then(function (scores) {
+            predPromises.push(global.model.predict([tensor.reshape([1, 28, 28, 1])]).array());
+            console.log("in for loop")
+        }
+        Promise.all(predPromises).then((results) => {
+            var pred_arr = [];
+            results.forEach((scores) => {
                 scores = scores[0];
-                var predicted = scores.indexOf(Math.max(...scores));
+                let predicted = scores.indexOf(Math.max(...scores));
+                console.log(predicted);
                 pred_arr.push(predicted)
                 console.log(pred_arr)
             });
-        }
-        
+            res.send({result:pred_arr});
+        })
+        .catch((err) => console.log(err));
     }
-    return { array: pred_arr, bboxes: bboxes }
+    //return { array: pred_arr, bboxes: bboxes }
 }
 
 module.exports = router;

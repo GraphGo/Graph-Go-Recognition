@@ -8,6 +8,7 @@ const cv = require('opencv.js')
 app.use(cors())
 app.options('*', cors())
 app.use(bodyParser.json({parameterLimit:500000,limit:'50mb', extended:true}));
+app.use(bodyParser.urlencoded({ extended: true }));
 app.set('trust proxy', true);
 
 const routes = require('./routes');
