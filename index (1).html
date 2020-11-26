@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-H0NW5Z2MYC');
+    </script>
+    <title>Demo</title>
+    <meta name="description" content="Simple Machine Learning Model into an WebApp using TensorFlow.js">
+    <meta name="keywords" content="Machine Learning, TensorFlow.js">
+    
+    <style>
+      body {
+        touch-action: none; 
+        font-family: "Roboto";
+      }
+      h1 {
+        margin: 50px;
+        font-size: 70px;
+        text-align: center;
+      }
+      #paint {
+        /* height:100px; */
+        border:3px solid black;
+        margin: auto;
+      }
+      #predicted { 
+        font-size: 60px;
+        margin-top: 60px;
+        text-align: center;
+      }
+      #number {
+        width: 50px;
+        border: 3px solid black;
+        margin: auto;
+        margin-top: 30px;
+        text-align: center;
+        vertical-align: middle;
+      }
+      #clear {
+        margin: auto;
+        margin-top: 70px;
+        padding: 30px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <!--<script type="text/javascript" src="http://livejs.com/live.js"></script>-->
+    <script src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.5.2/dist/tf.min.js"></script>
+    <script src="https://docs.opencv.org/3.4.0/opencv.js"></script>
+    <!-- <h1>Digit Recognition WebApp</h1> -->
+    <div id="paint">
+      <canvas id="myCanvas"></canvas>
+    </div>
+    <div id="predicted">
+      
+      <!-- <div id="number"></div> -->
+      <button id="clear">Clear</button>
+    </div>
+    <script>
+      function sortBboxLeftToRight(a, b){
+          if (a['x']<b['x']){
+              return -1;
+          }
+          else{
+              return 1;
+          }
+      }
+
+      function getSortedBboxes(canvas_id,x1,y1,x2,y2){
+        cvs = document.getElementById("myCanvas");
+        let src = cv.imread('myCanvas');
+        let rect = new cv.Rect(x1,y1,x2,y2);
+        src = src.roi(rect);
+        cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
+        cv.threshold(src, src, 10, 255, cv.THRESH_BINARY);
+        let ksize = new cv.Size(3, 3);
+        cv.GaussianBlur(src, src, ksize, 0)
+        cv.Canny(src, src, 30,150)
+        contours = new cv.MatVector();
+        hierarchy = new cv.Mat();
+        cv.findContours(src, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        pred_rois = []
+        for (let i = 0; i < contours.size(); ++i) {
+          pred_rois.push(cv.boundingRect(contours.get(i)));
+        }
+        pred_rois.sort(sortBboxLeftToRight)
+        //psuedo non-max suppression based purely on iou
+        suppressed_rois = []
+        suppressed_rois.push(pred_rois[0])
+        for (let i = 1; i < pred_rois.length; ++i) {
+          last_roi = suppressed_rois[suppressed_rois.length-1]
+          if (pred_rois[i].x > last_roi.x+last_roi.width){
+            suppressed_rois.push(pred_rois[i])
+          }
+        }
+        return suppressed_rois
+      }
+
+      function predict_(canvas_id,x1,y1,x2,y2){
+        if (window.model){
+          bboxes = getSortedBboxes(canvas_id,x1,y1,x2,y2);
+          var canvas = document.getElementById(canvas_id);
+          var context = canvas.getContext('2d');
+          var input;
+          var model;
+          
+          pred_arr = []
+          for (let i = 0; i < bboxes.length; ++i) {
+            input = context.getImageData(bboxes[i].x+x1, bboxes[i].y+y1, bboxes[i].width, bboxes[i].height);
+            input = cv.matFromImageData(input);
+            cv.cvtColor(input, input, cv.COLOR_RGBA2GRAY, 0);
+            
+            if (bboxes[i].width>bboxes[i].height){
+              height = Math.floor(20*bboxes[i].height/bboxes[i].width);
+              cv.resize(input, input, new cv.Size(20, height), 0, 0, cv.INTER_CUBIC);
+              pad_top = Math.floor((28-height)/2);
+              cv.copyMakeBorder(input, input, pad_top, 28-pad_top-height, 4,4,cv.BORDER_CONSTANT,new cv.Scalar(0))
+            }
+            else{
+              width = Math.floor(20*bboxes[i].width/bboxes[i].height);
+              pad_left = Math.floor((28-width)/2);
+              cv.resize(input, input, new cv.Size(width, 20), 0, 0, cv.INTER_CUBIC);
+              cv.copyMakeBorder(input, input, 4,4,pad_left, 28-pad_left-width,cv.BORDER_CONSTANT,new cv.Scalar(0))
+            }
+            cv.threshold(input, input, 10, 255, cv.THRESH_BINARY);
+            
+            //cv.imshow()
+            tensor = []
+            for (let i = 0; i<28;++i){
+              tensor_row = []
+              for (let j = 0; j<28;++j){
+                tensor_row.push(input.data[i*28+j])
+              }
+              tensor.push(tensor_row)
+            }
+            
+            tensor = tf.tensor(tensor).div(255)
+            // mat = cv.matFromArray(28, 28, cv.CV_8U, tensor.dataSync());
+            // cv.imshow('myCanvas', mat);
+            // tensor = tensor.div(255)
+            window.model.predict([tensor.reshape([1, 28, 28, 1])]).array().then(function(scores){
+                scores = scores[0];
+                predicted = scores.indexOf(Math.max(...scores));
+                pred_arr.push(predicted)
+              });
+            }
+          }
+          return pred_arr
+        }
+      
+
+
+
+
+    Array.prototype.max = function() {
+      return Math.max.apply(null, this);
+    };
+
+    Array.prototype.min = function() {
+      return Math.min.apply(null, this);
+    };
+    
+    
+    $('#paint').css({'width': '1800px'});
+    $('#number').css({'width': '100px', 'font-size': '60px'});
+    $('#clear').css({'font-size': '35px'});
+    
+
+    var cw = $('#paint').width();
+    $('#paint').css({'height': cw/3 + 'px'});
+
+    cw = $('#number').width();
+    $('#number').css({'height': cw + 'px'});
+
+    // From https://www.html5canvastutorials.com/labs/html5-canvas-paint-application/
+    var canvas = document.getElementById('myCanvas');
+    var context = canvas.getContext('2d');
+
+    var compuetedStyle = getComputedStyle(document.getElementById('paint'));
+    canvas.width = parseInt(compuetedStyle.getPropertyValue('width'));
+    canvas.height = parseInt(compuetedStyle.getPropertyValue('height'));
+
+    var mouse = {x: 0, y: 0};
+    var arr_x = []
+    var arr_y = []
+    var old_arr_x = []
+    var old_arr_y = []
+    var old_bbox = []
+    var predicted_arr = []
+    var same_object = false;
+    var input;
+    var place_holder=false;
+    canvas.addEventListener('mousemove', function(e) {
+      mouse.x = e.pageX - this.offsetLeft;
+      mouse.y = e.pageY - this.offsetTop;
+      
+    }, false);
+
+    context.lineWidth = 7;
+    context.lineJoin = 'round';
+    context.lineCap = 'round';
+    context.strokeStyle = 'purple';
+
+    canvas.addEventListener('mousedown', function(e) {
+      place_holder=false;
+      if (arr_x.length!=0 & arr_y.length!=0){
+        if (mouse.x - arr_x.max()< 30){
+            same_object = true;
+            console.log('Same object')
+        }
+        else{
+            same_object = false;
+            arr_x=[];
+            arr_y=[];
+        }
+      }
+      
+      
+      context.moveTo(mouse.x, mouse.y);
+      context.beginPath();
+      canvas.addEventListener('mousemove', onPaint, false);
+    }, false);
+
+    canvas.addEventListener('mouseup', function() {
+    //   $('#number').html('<img id="spinner" src="spinner.gif"/>');
+      
+        canvas.removeEventListener('mousemove', onPaint, false);
+    
+    }, false);
+
+    var onPaint = function() {
+      arr_x.push(mouse.x)
+      arr_y.push(mouse.y)
+      context.lineTo(mouse.x, mouse.y);
+      context.stroke();
+    };
+
+    tf.loadLayersModel('https://raw.githubusercontent.com/Rabona17/tfjs_models/main/model/model.json').then(function(mdl) {
+          window.model = mdl;
+          console.log('ready');
+    });
+    
+
+    
+
+    $('#clear').click(function(){
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      mouse = {x: 0, y: 0};
+      arr_x = []
+      arr_y = []
+      local_arr_x = []
+      local_arr_y = []
+      old_bbox = []
+      predicted_arr = []
+      same_object = false;
+    //   $('#number').html('');
+    });
+    </script>
+  </body>
+</html>

@@ -10,8 +10,10 @@
   "license": "ISC",
   "dependencies": {
     "body-parser": "^1.19.0",
+    "canvas": "^2.6.1",
     "cors": "^2.8.5",
     "express": "^4.17.1",
+    "jsdom": "^16.4.0",
     "nodemon": "^2.0.6",
     "opencv.js": "^1.2.1"
   }
