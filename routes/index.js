@@ -120,7 +120,6 @@ function predict_(imageData, res) {
             // cv.imshow('myCanvas', mat);
             // tensor = tensor.div(255)
             predPromises.push(global.model.predict([tensor.reshape([1, 28, 28, 1])]).array());
-            console.log("in for loop")
         }
         Promise.all(predPromises).then((results) => {
             var pred_arr = [];
