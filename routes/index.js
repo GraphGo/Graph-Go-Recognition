@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const cv = require('opencv.js')
-const { Canvas, createCanvas, Image, ImageData, getContext } = require('canvas');
-const { JSDOM } = require('jsdom');
+
 const tf = require('@tensorflow/tfjs-node');
 const jimp = require('jimp')
 
