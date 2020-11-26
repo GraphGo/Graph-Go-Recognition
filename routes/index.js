@@ -13,29 +13,23 @@ router.post('/', async (req, res) => {
         });
     }
     if (!global.model) {
-        try{
         global.model = await tf.loadLayersModel('https://raw.githubusercontent.com/Rabona17/tfjs_models/main/model/model.json');
-        } catch{}
     }
+    /* uncomment for testing
     console.log("finished loading models");
     console.log(req.body);
-    // try {
+    */
     const buf = await Buffer.from(req.body.data, 'base64');
-    // } catch(err) {
-    //     console.log(err);
-    // }
+
     let jimpSrc = await jimp.read(buf);
-    jimpSrc.write('currentImage.png');
-    jimpSrc.crop(parseInt(req.body.left)+5,parseInt(req.body.top)+5, parseInt(req.body.width)-10, parseInt(req.body.height)-10).write('./a.png');
+
+    jimpSrc.crop(parseInt(req.body.left)+5,parseInt(req.body.top)+5, parseInt(req.body.width)-10, parseInt(req.body.height)-10);
+    /* uncomment for testing
+        jimpSrc.write('currentImage.png');
     console.log(jimpSrc.getWidth());
-    //installDOM();
     console.log(req.body);
-    // var img = new Image();
-    // img.src = req.body.data;
-    // const canvas = createCanvas(img.width, img.height);
-    // const ctx = canvas.getContext('2d');
-    // ctx.drawImage(img, 0, 0);
-    // var imageData = ctx.getImageData(req.body.left, req.body.top, req.body.width, req.body.height);
+    */
+
     predict_(jimpSrc.bitmap, res);
 
     // call recognition function
@@ -45,14 +39,7 @@ router.post('/', async (req, res) => {
 
 function getSortedBboxes(imageData) {
     let src = cv.matFromImageData(imageData);
-    //var cvs = document.getElementById("myCanvas");
-    //var src = cv.imread('myCanvas');
-    //var src = context.getImageData(bboxes[i].x+x1, bboxes[i].y+y1, bboxes[i].width, bboxes[i].height);
-    //console.log(src.rows, src.cols)
 
-
-    // var rect = new cv.Rect(0,0,1440,480);
-    // src = src.roi(rect);
     cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
     cv.threshold(src, src, 10, 255, cv.THRESH_BINARY);
     var ksize = new cv.Size(3, 3);
@@ -65,7 +52,7 @@ function getSortedBboxes(imageData) {
     for (let i = 0; i < contours.size(); ++i) {
         pred_rois.push(cv.boundingRect(contours.get(i)));
     }
-    console.log(pred_rois.length)
+
     pred_rois.sort(sortBboxLeftToRight)
     //psuedo non-max suppression based purely on iou
     var suppressed_rois = []
@@ -92,7 +79,6 @@ function predict_(imageData, res) {
         // var canvas = document.getElementById(canvas_id);
         // var context = canvas.getContext('2d');
         let input1 = cv.matFromImageData(imageData);
-        var model;
 
         let predPromises = []
         for (let i = 0; i < bboxes.length; ++i) {
@@ -141,15 +127,17 @@ function predict_(imageData, res) {
             results.forEach((scores) => {
                 scores = scores[0];
                 let predicted = scores.indexOf(Math.max(...scores));
-                console.log(predicted);
+
                 pred_arr.push(predicted)
+                /* uncomment for testing
+                console.log(predicted);
                 console.log(pred_arr)
+                */
             });
             res.send({result:pred_arr});
         })
         .catch((err) => console.log(err));
     }
-    //return { array: pred_arr, bboxes: bboxes }
 }
 
 module.exports = router;
