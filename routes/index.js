@@ -80,7 +80,14 @@ function predict_(imageData, res) {
         let input1 = cv.matFromImageData(imageData);
 
         let predPromises = []
+        var ref_height = bboxes[0].height
+        var break_points = [];
         for (let i = 0; i < bboxes.length; ++i) {
+            if ((bboxes[i].height<(ref_height/2.5))){
+                break_points.push(i)
+                //console.log('bp')
+                continue;
+            }
             // var input = context.getImageData(bboxes[i].x+x1, bboxes[i].y+y1, bboxes[i].width, bboxes[i].height);
             // input = cv.matFromImageData(input);
 
@@ -132,7 +139,19 @@ function predict_(imageData, res) {
                 console.log(pred_arr)
                 */
             });
-            res.send({result:pred_arr});
+            var prediced = '['
+            for (let i = 1; i<pred_arr.length-1;++i){
+                // if ((pred_arr[i] == 11) || (pred_arr[i] == 10)){
+                // pred_arr[i] = 7
+                // }
+                prediced = prediced+pred_arr[i]
+            }
+            prediced = prediced+']'
+            
+            for (let i =0; i< break_points.length;++i){
+                prediced = prediced.substr(0,break_points[i])+','+prediced.substr(break_points[i])
+            }
+            res.send({result:eval(prediced)});
         })
         .catch((err) => console.log(err));
     }
